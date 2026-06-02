@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "987596029908",
+    "project_id": "cowboy-trio-doonghwi",
+    "storage_bucket": "cowboy-trio-doonghwi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:987596029908:android:1b35f9c955564cf3992041",
+        "android_client_info": {
+          "package_name": "com.doonghwi.cowboy_trio"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA00VrDOQctMf9gbN8-MUkKCBeB5RVqpbk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
