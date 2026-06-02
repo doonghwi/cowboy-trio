@@ -47,9 +47,10 @@ class HowToPlayScreen extends StatelessWidget {
               _Rule(
                 icon: Icons.shield,
                 color: CD.sage,
-                title: '방어 (좌/우)',
-                body: '들어오는 총알을 막아요. 방어도 방향이 있어요 — 왼쪽에서 오는 총알은 왼쪽 방어로, '
-                    '오른쪽은 오른쪽 방어로. 양쪽 방어로 두 방향 모두 막을 수 있어요.',
+                title: '방어 (개수)',
+                body: '들어오는 총알을 막아요. 방어는 방향이 아니라 개수! '
+                    '방어 1개는 한 발만 막아요(어느 쪽이든) — 양쪽에서 동시에 맞으면 한 발은 통과해 탈락. '
+                    '방어 2개는 양쪽에서 맞아도 모두 막아 살아남아요.',
               ),
               _Rule(
                 icon: Icons.emoji_events,

@@ -52,19 +52,25 @@ int rightOf(int seat) => (seat + 1) % kSeats;
 int leftOf(int seat) => (seat + 2) % kSeats;
 
 /// One cowboy's full commitment for a turn: exactly two action-slots, captured
-/// as a reload count plus per-direction defend/shoot flags.
+/// as a reload count, a defend count, and per-direction shoot flags.
+///
+/// Defence is by **count**, not direction: each defend slot soaks up one
+/// incoming bullet from *either* side. So two defends survive a hit from both
+/// neighbours at once, while one defend stops a single hit (whichever side it
+/// comes from) but is overwhelmed if both sides fire.
 class Move {
   /// Number of reload slots used this turn (0, 1 or 2).
   final int reload;
-  final bool defendLeft;
-  final bool defendRight;
+
+  /// Number of defend slots used this turn (0, 1 or 2) — incoming hits this can
+  /// absorb, regardless of direction.
+  final int defend;
   final bool shootLeft;
   final bool shootRight;
 
   const Move({
     this.reload = 0,
-    this.defendLeft = false,
-    this.defendRight = false,
+    this.defend = 0,
     this.shootLeft = false,
     this.shootRight = false,
   });
@@ -73,46 +79,37 @@ class Move {
 
   /// How many of the two slots are filled.
   int get slotsUsed =>
-      reload +
-      (defendLeft ? 1 : 0) +
-      (defendRight ? 1 : 0) +
-      (shootLeft ? 1 : 0) +
-      (shootRight ? 1 : 0);
+      reload + defend + (shootLeft ? 1 : 0) + (shootRight ? 1 : 0);
 
   /// A turn is ready to submit once both slots are committed.
   bool get isComplete => slotsUsed == kSlots;
 
   int get shootsRequested => (shootLeft ? 1 : 0) + (shootRight ? 1 : 0);
-  int get defendsRequested => (defendLeft ? 1 : 0) + (defendRight ? 1 : 0);
 
   /// Compact integer encoding for Firebase (avoids storing a nested map).
-  /// bits 0-1 reload, bit2 defendL, bit3 defendR, bit4 shootL, bit5 shootR.
+  /// bits 0-1 reload, bits 2-3 defend, bit4 shootL, bit5 shootR.
   int encode() =>
       (reload & 3) |
-      (defendLeft ? 4 : 0) |
-      (defendRight ? 8 : 0) |
+      ((defend & 3) << 2) |
       (shootLeft ? 16 : 0) |
       (shootRight ? 32 : 0);
 
   static Move decode(int c) => Move(
         reload: c & 3,
-        defendLeft: c & 4 != 0,
-        defendRight: c & 8 != 0,
+        defend: (c >> 2) & 3,
         shootLeft: c & 16 != 0,
         shootRight: c & 32 != 0,
       );
 
   Move copyWith({
     int? reload,
-    bool? defendLeft,
-    bool? defendRight,
+    int? defend,
     bool? shootLeft,
     bool? shootRight,
   }) =>
       Move(
         reload: reload ?? this.reload,
-        defendLeft: defendLeft ?? this.defendLeft,
-        defendRight: defendRight ?? this.defendRight,
+        defend: defend ?? this.defend,
         shootLeft: shootLeft ?? this.shootLeft,
         shootRight: shootRight ?? this.shootRight,
       );
@@ -188,19 +185,18 @@ TurnOutcome resolveTurn(
   }
 
   // Work out who takes a clean hit. A shot at seat T arrives from T's left
-  // neighbour (who fired right) or T's right neighbour (who fired left); each
-  // side is stopped by the matching defend.
+  // neighbour (who fired right) and/or T's right neighbour (who fired left).
+  // Defence is by count: each defend slot soaks one incoming bullet from any
+  // side, so a seat falls only when the incoming hits outnumber its defends.
   final hit = List<bool>.filled(kSeats, false);
   for (var t = 0; t < kSeats; t++) {
     if (!aliveBefore[t]) continue;
     final m = moves[t];
     final L = leftOf(t);
     final R = rightOf(t);
-    final incomingFromLeft = aliveBefore[L] && firedRight[L];
-    final incomingFromRight = aliveBefore[R] && firedLeft[R];
-    final hitFromLeft = incomingFromLeft && !m.defendLeft;
-    final hitFromRight = incomingFromRight && !m.defendRight;
-    if (hitFromLeft || hitFromRight) hit[t] = true;
+    final incoming = (aliveBefore[L] && firedRight[L] ? 1 : 0) +
+        (aliveBefore[R] && firedLeft[R] ? 1 : 0);
+    if (incoming > m.defend) hit[t] = true;
   }
 
   final ammoAfter = List<int>.filled(kSeats, 0);

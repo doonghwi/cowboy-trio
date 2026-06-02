@@ -6,14 +6,13 @@ void main() {
     test('round-trips every valid 2-slot combination', () {
       final moves = <Move>[
         const Move(reload: 2),
-        const Move(reload: 1, defendLeft: true),
-        const Move(reload: 1, defendRight: true),
+        const Move(reload: 1, defend: 1),
+        const Move(defend: 2),
         const Move(reload: 1, shootLeft: true),
         const Move(reload: 1, shootRight: true),
-        const Move(defendLeft: true, defendRight: true),
+        const Move(defend: 1, shootRight: true),
         const Move(shootLeft: true, shootRight: true),
-        const Move(defendLeft: true, shootRight: true),
-        const Move(defendRight: true, shootLeft: true),
+        const Move(defend: 1, shootLeft: true),
       ];
       for (final m in moves) {
         expect(m.slotsUsed, 2, reason: 'each fixture uses two slots');
@@ -76,11 +75,11 @@ void main() {
       expect(out.ammoAfter[0], 1);
     });
 
-    test('defending the correct side blocks the shot', () {
-      // Seat 0 shoots right at seat 1; seat 1 defends its left (incoming side).
+    test('one defend blocks a single incoming shot', () {
+      // Seat 0 shoots right at seat 1; seat 1 raises one shield.
       final out = resolveTurn(
         [const Move(shootRight: true, reload: 1),
-            const Move(defendLeft: true, reload: 1), const Move(reload: 2)],
+            const Move(defend: 1, reload: 1), const Move(reload: 2)],
         [1, 0, 0],
         [true, true, true],
       );
@@ -88,15 +87,27 @@ void main() {
       expect(out.aliveAfter, [true, true, true]);
     });
 
-    test('defending the wrong side does not help', () {
-      // Seat 1 defends its right, but the shot comes from its left (seat 0).
+    test('one defend is overwhelmed by hits from both sides', () {
+      // Both neighbours fire at seat 0; a single shield only stops one.
       final out = resolveTurn(
-        [const Move(shootRight: true, reload: 1),
-            const Move(defendRight: true, reload: 1), const Move(reload: 2)],
-        [1, 0, 0],
+        [const Move(defend: 1), const Move(shootLeft: true),
+            const Move(shootRight: true)],
+        [0, 1, 1],
         [true, true, true],
       );
-      expect(out.hit[1], isTrue);
+      expect(out.hit[0], isTrue);
+    });
+
+    test('two defends survive hits from both sides at once', () {
+      // Both neighbours fire at seat 0; two shields soak both bullets.
+      final out = resolveTurn(
+        [const Move(defend: 2), const Move(shootLeft: true),
+            const Move(shootRight: true)],
+        [0, 1, 1],
+        [true, true, true],
+      );
+      expect(out.hit[0], isFalse);
+      expect(out.aliveAfter[0], isTrue);
     });
 
     test('one cowboy can hit both neighbours in a single turn', () {

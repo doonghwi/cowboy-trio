@@ -8,7 +8,9 @@ import '../theme.dart';
 /// Enforces every rule at the UI level so [Move] always arrives valid:
 ///   * exactly two slots,
 ///   * no more shoots than current ammo,
-///   * no shooting (or defending) a seat that's already out.
+///   * no shooting a seat that's already out.
+///
+/// Defence is a **count** (방어 1개 / 2개), not a direction: pick it up to twice.
 class MovePicker extends StatefulWidget {
   final int myAmmo;
   final bool leftAlive;
@@ -42,20 +44,8 @@ class _MovePickerState extends State<MovePicker> {
     if (_free) setState(() => _m = _m.copyWith(reload: _m.reload + 1));
   }
 
-  void _toggleDefendLeft() {
-    if (_m.defendLeft) {
-      setState(() => _m = _m.copyWith(defendLeft: false));
-    } else if (_free) {
-      setState(() => _m = _m.copyWith(defendLeft: true));
-    }
-  }
-
-  void _toggleDefendRight() {
-    if (_m.defendRight) {
-      setState(() => _m = _m.copyWith(defendRight: false));
-    } else if (_free) {
-      setState(() => _m = _m.copyWith(defendRight: true));
-    }
+  void _addDefend() {
+    if (_free) setState(() => _m = _m.copyWith(defend: _m.defend + 1));
   }
 
   void _toggleShootLeft() {
@@ -80,10 +70,8 @@ class _MovePickerState extends State<MovePicker> {
       switch (tag) {
         case 'reload':
           _m = _m.copyWith(reload: _m.reload - 1);
-        case 'dl':
-          _m = _m.copyWith(defendLeft: false);
-        case 'dr':
-          _m = _m.copyWith(defendRight: false);
+        case 'defend':
+          _m = _m.copyWith(defend: _m.defend - 1);
         case 'sl':
           _m = _m.copyWith(shootLeft: false);
         case 'sr':
@@ -95,9 +83,8 @@ class _MovePickerState extends State<MovePicker> {
   List<_Chip> get _chips => [
         for (var i = 0; i < _m.reload; i++)
           const _Chip('reload', ActKind.reload, '장전'),
-        if (_m.defendLeft) _Chip('dl', ActKind.defend, '방어 ←${widget.leftName}'),
-        if (_m.defendRight)
-          _Chip('dr', ActKind.defend, '방어 ${widget.rightName}→'),
+        for (var i = 0; i < _m.defend; i++)
+          const _Chip('defend', ActKind.defend, '방어'),
         if (_m.shootLeft) _Chip('sl', ActKind.shoot, '빵야 ←${widget.leftName}'),
         if (_m.shootRight) _Chip('sr', ActKind.shoot, '빵야 ${widget.rightName}→'),
       ];
@@ -145,19 +132,12 @@ class _MovePickerState extends State<MovePicker> {
             ),
             _option(
               kind: ActKind.defend,
-              label: '방어 ←',
-              sub: widget.leftName,
-              selected: _m.defendLeft,
-              enabled: widget.leftAlive && (_m.defendLeft || _free),
-              onTap: _toggleDefendLeft,
-            ),
-            _option(
-              kind: ActKind.defend,
-              label: '방어 →',
-              sub: widget.rightName,
-              selected: _m.defendRight,
-              enabled: widget.rightAlive && (_m.defendRight || _free),
-              onTap: _toggleDefendRight,
+              label: '방어',
+              sub: _m.defend >= 2 ? '양쪽 막음' : '한 발 막음',
+              selected: _m.defend > 0,
+              badge: _m.defend > 0 ? '×${_m.defend}' : null,
+              enabled: _free,
+              onTap: _addDefend,
             ),
             _option(
               kind: ActKind.shoot,

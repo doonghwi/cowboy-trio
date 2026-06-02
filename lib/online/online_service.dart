@@ -139,32 +139,43 @@ class OnlineService {
     });
   }
 
-  /// Atomically claim the lowest free seat (p1, then p2). Returns the seat
-  /// index, or null if the room is missing/full.
+  /// Claim a guest seat. Seat 0 always belongs to the host, so joiners only ever
+  /// take p1 or p2. Each seat is claimed with its **own** transaction so two
+  /// joiners can never land on the same seat and no joiner can clobber another's
+  /// entry (a whole-node transaction run against a stale snapshot could). The
+  /// seat is read back from the committed snapshot, never a closure variable.
   Future<int?> joinRoom(String code, String name) async {
-    final exists = (await room(code).get()).exists;
-    if (!exists) return null;
-    int? claimed;
-    final result = await room(code).child('players').runTransaction((current) {
-      final map = _asMap(current) ?? <String, Object?>{};
-      // Already in the room? Keep the seat.
-      for (final e in map.entries) {
+    final snap = await room(code).child('players').get();
+    if (!snap.exists) return null;
+
+    // Re-joining with the same client id? Return my existing seat.
+    final existing = _asMap(snap.value);
+    if (existing != null) {
+      for (final e in existing.entries) {
         final v = _asMap(e.value);
-        if (v != null && v['id'] == clientId) {
-          claimed = seatOf(e.key.toString());
-          return Transaction.success(current);
-        }
+        if (v != null && v['id'] == clientId) return seatOf(e.key.toString());
       }
-      for (var s = 0; s < kSeats; s++) {
-        if (!map.containsKey(slotKey(s))) {
-          claimed = s;
-          map[slotKey(s)] = {'id': clientId, 'name': name};
-          return Transaction.success(map);
-        }
+    }
+
+    for (var s = 1; s < kSeats; s++) {
+      final res = await room(code).child('players/${slotKey(s)}').runTransaction(
+        (current) {
+          if (current == null) {
+            return Transaction.success({'id': clientId, 'name': name});
+          }
+          final v = _asMap(current);
+          if (v != null && v['id'] == clientId) {
+            return Transaction.success(current); // already mine
+          }
+          return Transaction.abort(); // taken by someone else
+        },
+      );
+      if (res.committed) {
+        final v = _asMap(res.snapshot.value);
+        if (v != null && v['id'] == clientId) return s;
       }
-      return Transaction.abort(); // full
-    });
-    return result.committed ? claimed : null;
+    }
+    return null; // room full
   }
 
   Future<void> submitMove(String code, int turn, int seat, Move m) {

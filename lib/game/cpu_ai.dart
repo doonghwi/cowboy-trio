@@ -25,12 +25,15 @@ class CpuAi {
     final leftThreat = leftAlive && ammo[l] > 0;
     final rightThreat = rightAlive && ammo[r] > 0;
 
-    // No ammo → cannot shoot. Build up, but raise a shield when menaced.
+    final threats = (leftThreat ? 1 : 0) + (rightThreat ? 1 : 0);
+
+    // No ammo → cannot shoot. Build up, but raise shields when menaced.
     if (myAmmo == 0) {
-      final threatened = leftThreat || rightThreat;
-      if (threatened && _r.nextDouble() < 0.7) {
-        final defLeft = leftThreat && (!rightThreat || _r.nextBool());
-        return Move(reload: 1, defendLeft: defLeft, defendRight: !defLeft);
+      if (threats == 2 && _r.nextDouble() < 0.5) {
+        return const Move(defend: 2); // brace for fire from both sides
+      }
+      if (threats >= 1 && _r.nextDouble() < 0.7) {
+        return const Move(reload: 1, defend: 1);
       }
       return const Move(reload: 2);
     }
@@ -46,7 +49,7 @@ class CpuAi {
       return const Move(shootLeft: true, shootRight: true);
     }
 
-    // Usual play: take one shot, then guard the other side or reload.
+    // Usual play: take one shot, then guard or reload.
     if (roll < 0.80 && livingDirs.isNotEmpty) {
       final Dir tgt;
       if (rightThreat && (!leftThreat || _r.nextBool())) {
@@ -57,24 +60,17 @@ class CpuAi {
         tgt = livingDirs[_r.nextInt(livingDirs.length)];
       }
       final shootR = tgt == Dir.right;
+      // If the side we're not shooting is also armed, raise a shield.
       final otherThreat = shootR ? leftThreat : rightThreat;
       if (otherThreat && _r.nextDouble() < 0.6) {
-        return Move(
-          shootRight: shootR,
-          shootLeft: !shootR,
-          defendLeft: shootR, // guard the side we're not shooting
-          defendRight: !shootR,
-        );
+        return Move(shootRight: shootR, shootLeft: !shootR, defend: 1);
       }
       return Move(reload: 1, shootRight: shootR, shootLeft: !shootR);
     }
 
-    // Turtle up.
-    if (leftThreat && rightThreat) {
-      return const Move(defendLeft: true, defendRight: true);
-    }
-    if (leftThreat) return const Move(defendLeft: true, reload: 1);
-    if (rightThreat) return const Move(defendRight: true, reload: 1);
+    // Turtle up — shields scale with the number of armed neighbours.
+    if (threats >= 2) return const Move(defend: 2);
+    if (threats == 1) return const Move(defend: 1, reload: 1);
     return const Move(reload: 2);
   }
 }

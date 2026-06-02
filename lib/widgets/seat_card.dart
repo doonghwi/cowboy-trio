@@ -162,8 +162,9 @@ class SeatCard extends StatelessWidget {
     for (var i = 0; i < m.reload; i++) {
       add(actionIcon(ActKind.reload), CD.gold);
     }
-    if (m.defendLeft) add(actionIcon(ActKind.defend), CD.sage, tip: '←');
-    if (m.defendRight) add(actionIcon(ActKind.defend), CD.sage, tip: '→');
+    for (var i = 0; i < m.defend; i++) {
+      add(actionIcon(ActKind.defend), CD.sage);
+    }
     if (m.shootLeft) {
       add(actionIcon(ActKind.shoot), firedLeft ? CD.danger : CD.muted, tip: '←');
     }
